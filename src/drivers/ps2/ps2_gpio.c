@@ -1298,7 +1298,7 @@ static int ps2_gpio_init_gpio(void) {
 
     // Overwrite any user-provided flags from the devicetree
     data->scl_gpio.dt_flags = 0;
-    data->scl_gpio.dt_flags = 0;
+    data->sda_gpio.dt_flags = 0;
 
     // Setup interrupt callback for clock line
     gpio_init_callback(&data->scl_cb_data, ps2_gpio_scl_interrupt_handler, BIT(data->scl_gpio.pin));
