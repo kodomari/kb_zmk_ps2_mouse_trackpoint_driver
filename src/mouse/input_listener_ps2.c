@@ -282,7 +282,7 @@ void zmk_input_listener_ps2_layer_toggle_activate_layer(struct k_work *item) {
 
 #else
 
-        zmk_keymap_layer_activate(config->layer_toggle);
+        zmk_keymap_layer_activate(config->layer_toggle, false);
 
 #endif /* IS_ENABLED(CONFIG_ZMK_INPUT_MOUSE_PS2_ENABLE_UROB_COMPAT) */
 
@@ -302,8 +302,8 @@ void zmk_input_listener_ps2_layer_toggle_deactivate_layer(struct k_work *item) {
 
     LOG_INF("Deactivating layer %d due to mouse activity...", config->layer_toggle);
 
-    if (zmk_keymap_layer_active(config->layer_toggle)) {
-        zmk_keymap_layer_deactivate(config->layer_toggle);
+    if (zmk_keymap_layer_active(config->layer_toggle, false)) {
+        zmk_keymap_layer_deactivate(config->layer_toggle, false);
     }
 
     data->layer_toggle_layer_enabled = false;
