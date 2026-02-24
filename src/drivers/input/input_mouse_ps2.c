@@ -511,16 +511,23 @@ static bool zmk_mouse_ps2_is_non_zero_1d_movement(int16_t speed) { return speed 
 
 void zmk_mouse_ps2_activity_move_mouse(int16_t mov_x, int16_t mov_y) {
     struct zmk_mouse_ps2_data *data = &zmk_mouse_ps2_data;
-    int ret = 0;
+    int ret;
 
     bool have_x = zmk_mouse_ps2_is_non_zero_1d_movement(mov_x);
     bool have_y = zmk_mouse_ps2_is_non_zero_1d_movement(mov_y);
 
+    LOG_DBG("MOVE: mov_x=%d mov_y=%d have_x=%d have_y=%d dev=%p",
+            mov_x, mov_y, have_x, have_y, data->dev);
+
     if (have_x) {
         ret = input_report_rel(data->dev, INPUT_REL_X, mov_x, !have_y, K_NO_WAIT);
+        LOG_DBG("REPORT: REL_X val=%d sync=%d ret=%d", mov_x, !have_y, ret);
+        if (ret) { LOG_ERR("input_report_rel(X) failed: %d", ret); }
     }
     if (have_y) {
         ret = input_report_rel(data->dev, INPUT_REL_Y, mov_y, true, K_NO_WAIT);
+        LOG_DBG("REPORT: REL_Y val=%d sync=1 ret=%d", mov_y, ret);
+        if (ret) { LOG_ERR("input_report_rel(Y) failed: %d", ret); }
     }
 }
 
