@@ -313,12 +313,6 @@ int ps2_gpio_configure_pin_scl(gpio_flags_t flags, char *descr) {
     return err;
 }
 
-int ps2_gpio_configure_pin_scl_input() { return ps2_gpio_configure_pin_scl((GPIO_INPUT), "input"); }
-
-int ps2_gpio_configure_pin_scl_output() {
-    return ps2_gpio_configure_pin_scl((GPIO_OUTPUT_HIGH), "output");
-}
-
 int ps2_gpio_configure_pin_sda(gpio_flags_t flags, char *descr) {
     struct ps2_gpio_data *data = &ps2_gpio_data;
     int err;
@@ -331,10 +325,20 @@ int ps2_gpio_configure_pin_sda(gpio_flags_t flags, char *descr) {
     return err;
 }
 
-int ps2_gpio_configure_pin_sda_input() { return ps2_gpio_configure_pin_sda((GPIO_INPUT), "input"); }
+int ps2_gpio_configure_pin_scl_input(void) {
+    return ps2_gpio_configure_pin_scl(GPIO_INPUT | GPIO_PULL_UP, "input");
+}
 
-int ps2_gpio_configure_pin_sda_output() {
-    return ps2_gpio_configure_pin_sda((GPIO_OUTPUT_HIGH), "output");
+int ps2_gpio_configure_pin_scl_output(void) {
+    return ps2_gpio_configure_pin_scl(GPIO_OUTPUT_HIGH | GPIO_OPEN_DRAIN | GPIO_PULL_UP, "output");
+}
+
+int ps2_gpio_configure_pin_sda_input(void) {
+    return ps2_gpio_configure_pin_sda(GPIO_INPUT | GPIO_PULL_UP, "input");
+}
+
+int ps2_gpio_configure_pin_sda_output(void) {
+    return ps2_gpio_configure_pin_sda(GPIO_OUTPUT_HIGH | GPIO_OPEN_DRAIN | GPIO_PULL_UP, "output");
 }
 
 bool ps2_gpio_get_byte_parity(uint8_t byte) {
