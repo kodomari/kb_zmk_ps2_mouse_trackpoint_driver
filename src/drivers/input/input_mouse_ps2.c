@@ -1611,11 +1611,11 @@ static int zmk_mouse_ps2_init(const struct device *dev) {
     LOG_DBG("Inside zmk_mouse_ps2_init");
 
     LOG_DBG("Creating mouse_ps2 init thread.");
-k_thread_create(&zmk_mouse_ps2_data.thread,
-                K_KERNEL_STACK_BUFFER(zmk_mouse_ps2_data.thread_stack),
+    k_thread_create(&zmk_mouse_ps2_data.thread,
+                zmk_mouse_ps2_data.thread_stack,
                 K_KERNEL_STACK_SIZEOF(zmk_mouse_ps2_data.thread_stack),
                 (k_thread_entry_t)zmk_mouse_ps2_init_thread,
-                (struct device *)dev, 0, NULL,
+                (void *)dev, NULL, NULL,
                 K_PRIO_COOP(MOUSE_PS2_THREAD_PRIORITY), 0,
                 K_MSEC(ZMK_MOUSE_PS2_INIT_THREAD_DELAY_MS));
     return 0;
