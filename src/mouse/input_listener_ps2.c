@@ -17,8 +17,9 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 
 #include <zmk/endpoints.h>
 #include <zmk/keymap.h>
-#include <zmk/mouse/types.h>
-#include <zmk/mouse/hid.h>
+#include <zmk/pointing.h>
+#include <zmk/hid.h>
+#include <zmk/pointing.h>
 
 #define ONE_IF_DEV_OK(n)                                                                           \
     COND_CODE_1(DT_NODE_HAS_STATUS(DT_INST_PHANDLE(n, device), okay), (1 +), (0 +))
