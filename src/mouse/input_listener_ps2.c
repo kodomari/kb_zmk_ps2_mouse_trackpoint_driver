@@ -348,20 +348,16 @@ static int zmk_input_listener_ps2_layer_toggle_init(const struct input_listener_
                     .layer_toggle_layer_enabled = false,                                           \
                     .layer_toggle_last_mouse_package_time = 0,                                     \
                 };                                                                                 \
-static void input_handler_ps2_##n(const struct device *dev,                       \
-                                  struct input_event *evt,                        \
-                                  void *user_data) {                              \
-    ARG_UNUSED(dev);                                                               \
-    struct input_listener_ps2_data *data = user_data;                              \
-    input_handler_ps2(&config_##n, data, evt);                                     \
-}                                                                                  \
-                                                                                   \
-INPUT_CALLBACK_DEFINE(                                                             \
-    DEVICE_DT_GET(DT_INST_PHANDLE(n, device)),                                     \
-    input_handler_ps2_##n,                                                         \
-    &data_##n                                                                      \
-);                                                                                 \
-\
+static void input_handler_ps2_##n(struct input_event *evt, void *user_data) { \
+    struct input_listener_ps2_data *data = user_data;                         \
+    input_handler_ps2(&config_##n, data, evt);                                \
+}                                                                             \
+                                                                              \
+INPUT_CALLBACK_DEFINE(                                                        \
+    DEVICE_DT_GET(DT_INST_PHANDLE(n, device)),                                \
+    input_handler_ps2_##n,                                                    \
+    &data_##n                                                                 \
+);                                                                            \
             static int zmk_input_listener_ps2_init_##n(const struct device *dev) {                     \
                 struct input_listener_ps2_data *data = dev->data;                                      \
                 const struct input_listener_ps2_config *config = dev->config;                          \
