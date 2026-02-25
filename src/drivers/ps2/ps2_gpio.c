@@ -694,7 +694,9 @@ void ps2_gpio_read_scl_timeout(struct k_work *item) {
     struct ps2_gpio_data *data = CONTAINER_OF(d_work, struct ps2_gpio_data, read_scl_timout);
 
     LOG_PS2_INT("Read SCL timeout", NULL);
-
+LOG_ERR("SCL=%d SDA=%d mode=%d rpos=%d wpos=%d",
+        ps2_gpio_get_scl(), ps2_gpio_get_sda(),
+        ps2_gpio_data.mode, ps2_gpio_data.cur_read_pos, ps2_gpio_data.cur_write_pos);
     // We don't request a resend if the timeout happens in the early
     // stage of the transmission.
     //
