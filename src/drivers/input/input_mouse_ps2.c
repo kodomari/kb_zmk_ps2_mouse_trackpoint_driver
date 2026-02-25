@@ -358,14 +358,11 @@ void zmk_mouse_ps2_activity_callback(const struct device *ps2_device, uint8_t by
 
 void zmk_mouse_ps2_activity_abort_cmd(char *reason) {
     struct zmk_mouse_ps2_data *data = &zmk_mouse_ps2_data;
-    const struct zmk_mouse_ps2_config *config = &zmk_mouse_ps2_config;
-    const struct device *ps2_device = config->ps2_device;
 
-    LOG_ERR("PS/2 Mouse cmd buffer is out of aligment. Requesting resend: %s", reason);
+    LOG_WRN("PS/2 packet out of alignment. Dropping: %s", reason);
 
+    // 送らない：ps2_write(ps2_device, 0xFE) を削除
     data->packet_idx = 0;
-    ps2_write(ps2_device, MOUSE_PS2_CMD_RESEND[0]);
-
     zmk_mouse_ps2_activity_reset_packet_buffer();
 }
 
