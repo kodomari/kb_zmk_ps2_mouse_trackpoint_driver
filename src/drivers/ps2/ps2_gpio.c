@@ -31,7 +31,7 @@ LOG_MODULE_REGISTER(ps2_gpio);
 // If the system is very busy with interrupts and other threads, then we
 // want to wait until that is over so that our write interrupts don't get
 // missed.
-#define PS2_GPIO_WORK_QUEUE_PRIORITY 10
+#define PS2_GPIO_WORK_QUEUE_PRIORITY 5
 #define PS2_GPIO_WORK_QUEUE_STACK_SIZE 1024
 
 // Custom queue for calling the zephyr ps/2 callback.
@@ -81,7 +81,7 @@ LOG_MODULE_REGISTER(ps2_gpio);
 // the clock. It's supposed to start immediately, but some devices
 // need much longer if you are asking them to interrupt an
 // ongoing read.
-#define PS2_GPIO_TIMING_SCL_INHIBITION_RESP_MAX 10000
+#define PS2_GPIO_TIMING_SCL_INHIBITION_RESP_MAX 50000
 
 // Writes start with us inhibiting the line and then respond
 // with 11 bits (start bit included in inhibition time).
@@ -111,7 +111,7 @@ LOG_MODULE_REGISTER(ps2_gpio);
 // PS/2 spec says that device must respond within 20msec,
 // but real life devices take much longer. Especially if
 // you interrupt existing transmissions.
-#define PS2_GPIO_TIMEOUT_WRITE_AWAIT_RESPONSE K_MSEC(300)
+#define PS2_GPIO_TIMEOUT_WRITE_AWAIT_RESPONSE K_MSEC(100)
 
 // Max time we allow the device to send the next clock signal during reads
 // and writes.
@@ -619,7 +619,7 @@ void ps2_gpio_read_interrupt_handler() {
             k_cyc_to_us_floor32(cur_read_cycle_cnt - last_read_cycle_cnt);
 
         if (prev_cycle_delta_us > PS2_GPIO_TIMING_SCL_CYCLE_MAX) {
-            ps2_gpio_read_abort(true, "missed interrupt");
+            ps2_gpio_read_abort(false, "missed interrupt");
         }
     }
 
