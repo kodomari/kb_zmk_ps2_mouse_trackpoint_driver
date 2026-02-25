@@ -404,6 +404,10 @@ void zmk_mouse_ps2_activity_reset_packet_buffer() {
 
 void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, uint8_t packet_state,
                                         uint8_t packet_x, uint8_t packet_y, uint8_t packet_extra) {
+    packet_state &= ~0x07;  
+    // Bit0(L), Bit1(R), Bit2(M) を全部0に固定
+    // 以降、packet_stateから mov_x/mov_y/button を解釈しても
+    // ボタンは常に 0 扱いになる
     struct zmk_mouse_ps2_data *data = &zmk_mouse_ps2_data;
     struct zmk_mouse_ps2_packet packet;
     packet = zmk_mouse_ps2_activity_parse_packet_buffer(packet_mode, packet_state, packet_x,
@@ -508,8 +512,10 @@ static bool zmk_mouse_ps2_is_non_zero_1d_movement(int16_t speed) { return speed 
 
 void zmk_mouse_ps2_activity_move_mouse(int16_t mov_x, int16_t mov_y) {
     struct zmk_mouse_ps2_data *data = &zmk_mouse_ps2_data;
-    int ret;
-mov_y = -mov_y;
+    int ret = 0;
+    mov_y = -mov_y;
+    if (mov_x >= -2 && mov_x <= 2) mov_x = 0;
+    if (mov_y >= -2 && mov_y <= 2) mov_y = 0;
     bool have_x = zmk_mouse_ps2_is_non_zero_1d_movement(mov_x);
     bool have_y = zmk_mouse_ps2_is_non_zero_1d_movement(mov_y);
 
