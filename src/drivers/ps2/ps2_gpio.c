@@ -658,7 +658,7 @@ void ps2_gpio_read_interrupt_handler() {
             // If we got to the parity bit and it's incorrect then we
             // are definitly in a transmission and out of sync. So we
             // request a resend.
-            ps2_gpio_read_abort(true, "invalid parity bit");
+            ps2_gpio_read_abort(false, "invalid parity bit");
             return;
         }
     } else if (data->cur_read_pos == PS2_GPIO_POS_STOP) {
@@ -668,7 +668,7 @@ void ps2_gpio_read_interrupt_handler() {
             // If we got to the stop bit and it's incorrect then we
             // are definitly in a transmission and out of sync. So we
             // request a resend.
-            ps2_gpio_read_abort(true, "invalid stop bit");
+            ps2_gpio_read_abort(false, "invalid stop bit");
             return;
         }
 
