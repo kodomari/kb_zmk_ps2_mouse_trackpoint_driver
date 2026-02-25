@@ -509,7 +509,7 @@ static bool zmk_mouse_ps2_is_non_zero_1d_movement(int16_t speed) { return speed 
 void zmk_mouse_ps2_activity_move_mouse(int16_t mov_x, int16_t mov_y) {
     struct zmk_mouse_ps2_data *data = &zmk_mouse_ps2_data;
     int ret;
-
+mov_y = -mov_y;
     bool have_x = zmk_mouse_ps2_is_non_zero_1d_movement(mov_x);
     bool have_y = zmk_mouse_ps2_is_non_zero_1d_movement(mov_y);
 
