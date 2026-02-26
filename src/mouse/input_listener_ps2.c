@@ -189,17 +189,19 @@ static void clear_xy_data(struct input_listener_ps2_xy_data *data) {
 
 static void input_handler_ps2(const struct input_listener_ps2_config *config,
                           struct input_listener_ps2_data *data, struct input_event *evt) {
+/*
     LOG_DBG("RAW: type=%u code=%u(%s) value=%d (0x%x)",
             evt->type, evt->code, get_input_code_name(evt), evt->value, (uint32_t)evt->value);
-
+*/
+    
     // First, filter to update the event data as needed.
     filter_with_input_config(config, evt);
-
+/*
     LOG_DBG("FLT: type=%u code=%u(%s) value=%d (0x%x)",
             evt->type, evt->code, get_input_code_name(evt), evt->value, (uint32_t)evt->value);
 
     LOG_DBG("Got input_handler_ps2 event: %s with value 0x%x", get_input_code_name(evt), evt->value);
-
+*/
     zmk_input_listener_ps2_layer_toggle_input_rel_received(config, data);
 
     switch (evt->type) {
