@@ -412,7 +412,12 @@ void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, u
     struct zmk_mouse_ps2_packet packet;
     packet = zmk_mouse_ps2_activity_parse_packet_buffer(packet_mode, packet_state, packet_x,
                                                         packet_y, packet_extra);
-
+/* 壊れパケット対策：-256 は「符号bitだけ立って下位8bitが0」の典型 */
+if (packet.mov_x == -256 || packet.mov_y == -256) {
+    LOG_WRN("Dropping PS/2 packet: mov_x=%d mov_y=%d (st=%02x x=%02x y=%02x)",
+            packet.mov_x, packet.mov_y, packet_state, packet_x, packet_y);
+    return;
+}
     int x_delta = abs(data->prev_packet.mov_x - packet.mov_x);
     int y_delta = abs(data->prev_packet.mov_y - packet.mov_y);
     
