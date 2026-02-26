@@ -415,18 +415,23 @@ void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, u
 
     int x_delta = abs(data->prev_packet.mov_x - packet.mov_x);
     int y_delta = abs(data->prev_packet.mov_y - packet.mov_y);
-
-    LOG_DBG("Got mouse activity cmd "
-            "(mov_x=%d, mov_y=%d, o_x=%d, o_y=%d, scroll=%d, "
-            "b_l=%d, b_m=%d, b_r=%d) and ("
-            "x_delta=%d, y_delta=%d)",
+    
+LOG_INF("PS2: st=%02x x=%02x y=%02x ex=%02x | sx=%d sy=%d | mov=%d,%d ov=%d,%d",
+        packet_state, packet_x, packet_y, packet_extra,
+        (packet_state >> 4) & 1, (packet_state >> 5) & 1,
+        packet.mov_x, packet.mov_y,
+        packet.overflow_x, packet.overflow_y);
+//    LOG_DBG("Got mouse activity cmd "
+//            "(mov_x=%d, mov_y=%d, o_x=%d, o_y=%d, scroll=%d, "
+//            "b_l=%d, b_m=%d, b_r=%d) and ("
+//            "x_delta=%d, y_delta=%d)",
             packet.mov_x, packet.mov_y, packet.overflow_x, packet.overflow_y, packet.scroll,
             packet.button_l, packet.button_m, packet.button_r, x_delta, y_delta);
 
 #if IS_ENABLED(CONFIG_ZMK_INPUT_MOUSE_PS2_ENABLE_ERROR_MITIGATION)
     if (packet.overflow_x == 1 && packet.overflow_y == 1) {
-        LOG_WRN("Detected overflow in both x and y. "
-                "Probably mistransmission. Aborting...");
+//        LOG_WRN("Detected overflow in both x and y. "
+//                "Probably mistransmission. Aborting...");
 
         zmk_mouse_ps2_activity_abort_cmd("Overflow in both x and y");
         return;
@@ -437,12 +442,12 @@ void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, u
     // But we only do this check if there was prior movement that wasn't
     // reset in `zmk_mouse_ps2_activity_packet_timout`.
     if ((packet.mov_x != 0 && packet.mov_y != 0) && (x_delta > 150 || y_delta > 150)) {
-        LOG_WRN("Detected malformed packet with "
-                "(mov_x=%d, mov_y=%d, o_x=%d, o_y=%d, scroll=%d, "
-                "b_l=%d, b_m=%d, b_r=%d) and ("
-                "x_delta=%d, y_delta=%d)",
-                packet.mov_x, packet.mov_y, packet.overflow_x, packet.overflow_y, packet.scroll,
-                packet.button_l, packet.button_m, packet.button_r, x_delta, y_delta);
+//        LOG_WRN("Detected malformed packet with "
+//                "(mov_x=%d, mov_y=%d, o_x=%d, o_y=%d, scroll=%d, "
+//                "b_l=%d, b_m=%d, b_r=%d) and ("
+//                "x_delta=%d, y_delta=%d)",
+//                packet.mov_x, packet.mov_y, packet.overflow_x, packet.overflow_y, packet.scroll,
+//                packet.button_l, packet.button_m, packet.button_r, x_delta, y_delta);
         zmk_mouse_ps2_activity_abort_cmd("Exceeds movement threshold.");
         return;
     }
