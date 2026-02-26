@@ -118,9 +118,10 @@ LOG_MODULE_REGISTER(ps2_gpio);
 // Even though PS/2 devices send the clock at most every 100us, it doesn't mean
 // that the interrupts always get triggered within that time. So we allow a
 // little extra time.
-#define PS2_GPIO_TIMEOUT_READ_SCL K_USEC(PS2_GPIO_TIMING_SCL_CYCLE_MAX + 50)
-#define PS2_GPIO_TIMEOUT_WRITE_SCL K_USEC(PS2_GPIO_TIMING_SCL_CYCLE_MAX + 50)
-
+// #define PS2_GPIO_TIMEOUT_READ_SCL K_USEC(PS2_GPIO_TIMING_SCL_CYCLE_MAX + 50)
+// #define PS2_GPIO_TIMEOUT_WRITE_SCL K_USEC(PS2_GPIO_TIMING_SCL_CYCLE_MAX + 50)
+#define PS2_GPIO_TIMEOUT_READ_SCL  K_USEC(800)
+#define PS2_GPIO_TIMEOUT_WRITE_SCL K_USEC(800)
 // But after inhibiting the clock line, sometimes clocks take a little longer
 // to start. So we allow a bit more time for the first write clock.
 #define PS2_GPIO_TIMEOUT_WRITE_SCL_START K_USEC(PS2_GPIO_TIMING_SCL_INHIBITION_RESP_MAX)
@@ -618,7 +619,9 @@ void ps2_gpio_read_interrupt_handler() {
         uint32_t prev_cycle_delta_us =
             k_cyc_to_us_floor32(cur_read_cycle_cnt - last_read_cycle_cnt);
 
-        if (prev_cycle_delta_us > PS2_GPIO_TIMING_SCL_CYCLE_MAX) {
+        #define PS2_GPIO_IRQ_GAP_MAX_US 800  // まずは 500〜1000us で試す
+
+        if (prev_cycle_delta_us > PS2_GPIO_IRQ_GAP_MAX_US) {
             ps2_gpio_read_abort(false, "missed interrupt");
         }
     }
