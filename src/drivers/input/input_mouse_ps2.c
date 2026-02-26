@@ -518,35 +518,37 @@ static bool zmk_mouse_ps2_is_non_zero_1d_movement(int16_t speed) { return speed 
 
 void zmk_mouse_ps2_activity_move_mouse(int16_t mov_x, int16_t mov_y) {
     struct zmk_mouse_ps2_data *data = &zmk_mouse_ps2_data;
-    int ret = 0;
+    int ret;
 
-    // Y反転
     mov_y = -mov_y;
 
-    // まず入力デッドゾーン
     const int16_t dz_in = 5;
-    if (mov_x > -dz_in && mov_x < dz_in) mov_x = 0;
-    if (mov_y > -dz_in && mov_y < dz_in) mov_y = 0;
+    bool x_idle = (mov_x > -dz_in && mov_x < dz_in);
+    bool y_idle = (mov_y > -dz_in && mov_y < dz_in);
+    if (x_idle) mov_x = 0;
+    if (y_idle) mov_y = 0;
 
-    // IIR平滑 (Q8)
     static int32_t fx = 0, fy = 0;
+
+    // ★入力がゼロの軸は状態を減衰（ドリフト止めに効く）
+    if (x_idle) fx = (fx * 3) / 4;
+    if (y_idle) fy = (fy * 3) / 4;
+
+    // IIR（必要なら 7→3 にして追従を速く）
     fx = (fx * 7 + ((int32_t)mov_x << 8)) / 8;
     fy = (fy * 7 + ((int32_t)mov_y << 8)) / 8;
 
-    // Q8 -> int16（丸め）
-    int16_t out_x = (int16_t)((fx + (fx >= 0 ? 128 : -128)) >> 8);
-    int16_t out_y = (int16_t)((fy + (fy >= 0 ? 128 : -128)) >> 8);
+    // ★Q8→int16 は 0方向丸め
+    int16_t out_x = (int16_t)(fx / 256);
+    int16_t out_y = (int16_t)(fy / 256);
 
-    // 平滑後デッドゾーン（ドリフト止め）
     const int16_t dz_out = 2;
     if (out_x > -dz_out && out_x < dz_out) out_x = 0;
     if (out_y > -dz_out && out_y < dz_out) out_y = 0;
 
-    // 出力が0なら内部状態も0にスナップ（ここが効く）
-    if (out_x == 0) fx = 0;
-    if (out_y == 0) fy = 0;
+    // ★完全停止なら完全リセット（残留一掃）
+    if (out_x == 0 && out_y == 0) { fx = 0; fy = 0; }
 
-    // クリップ（ジャンプ抑制）
     const int16_t cap = 40;
     if (out_x >  cap) out_x =  cap;
     if (out_x < -cap) out_x = -cap;
@@ -556,20 +558,10 @@ void zmk_mouse_ps2_activity_move_mouse(int16_t mov_x, int16_t mov_y) {
     bool have_x = zmk_mouse_ps2_is_non_zero_1d_movement(out_x);
     bool have_y = zmk_mouse_ps2_is_non_zero_1d_movement(out_y);
 
-    LOG_DBG("MOVE: mov_x=%d mov_y=%d have_x=%d have_y=%d dev=%p",
-            out_x, out_y, have_x, have_y, data->dev);
-
-    if (have_x) {
-        ret = input_report_rel(data->dev, INPUT_REL_X, out_x, !have_y, K_NO_WAIT);
-        LOG_DBG("REPORT: REL_X val=%d sync=%d ret=%d", out_x, !have_y, ret);
-        if (ret) { LOG_ERR("input_report_rel(X) failed: %d", ret); }
-    }
-    if (have_y) {
-        ret = input_report_rel(data->dev, INPUT_REL_Y, out_y, true, K_NO_WAIT);
-        LOG_DBG("REPORT: REL_Y val=%d sync=1 ret=%d", out_y, ret);
-        if (ret) { LOG_ERR("input_report_rel(Y) failed: %d", ret); }
-    }
+    if (have_x) input_report_rel(data->dev, INPUT_REL_X, out_x, !have_y, K_NO_WAIT);
+    if (have_y) input_report_rel(data->dev, INPUT_REL_Y, out_y, true, K_NO_WAIT);
 }
+
 void zmk_mouse_ps2_activity_click_buttons(bool button_l, bool button_m, bool button_r) {
     struct zmk_mouse_ps2_data *data = &zmk_mouse_ps2_data;
     const struct zmk_mouse_ps2_config *config = &zmk_mouse_ps2_config;
