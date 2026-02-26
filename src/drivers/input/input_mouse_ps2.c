@@ -518,48 +518,12 @@ static bool zmk_mouse_ps2_is_non_zero_1d_movement(int16_t speed) { return speed 
 
 void zmk_mouse_ps2_activity_move_mouse(int16_t mov_x, int16_t mov_y) {
     struct zmk_mouse_ps2_data *data = &zmk_mouse_ps2_data;
-    int ret;
 
-    mov_y = -mov_y;
+    // まずはここでは何もしない（反転もデッドゾーンも平滑も無し）
+    // mov_y = -mov_y;  ← いったん外す
 
-    const int16_t dz_in = 5;
-    bool x_idle = (mov_x > -dz_in && mov_x < dz_in);
-    bool y_idle = (mov_y > -dz_in && mov_y < dz_in);
-    if (x_idle) mov_x = 0;
-    if (y_idle) mov_y = 0;
-
-    static int32_t fx = 0, fy = 0;
-
-    // ★入力がゼロの軸は状態を減衰（ドリフト止めに効く）
-    if (x_idle) fx = (fx * 3) / 4;
-    if (y_idle) fy = (fy * 3) / 4;
-
-    // IIR（必要なら 7→3 にして追従を速く）
-    fx = (fx * 7 + ((int32_t)mov_x << 8)) / 8;
-    fy = (fy * 7 + ((int32_t)mov_y << 8)) / 8;
-
-    // ★Q8→int16 は 0方向丸め
-    int16_t out_x = (int16_t)(fx / 256);
-    int16_t out_y = (int16_t)(fy / 256);
-
-    const int16_t dz_out = 2;
-    if (out_x > -dz_out && out_x < dz_out) out_x = 0;
-    if (out_y > -dz_out && out_y < dz_out) out_y = 0;
-
-    // ★完全停止なら完全リセット（残留一掃）
-    if (out_x == 0 && out_y == 0) { fx = 0; fy = 0; }
-
-    const int16_t cap = 40;
-    if (out_x >  cap) out_x =  cap;
-    if (out_x < -cap) out_x = -cap;
-    if (out_y >  cap) out_y =  cap;
-    if (out_y < -cap) out_y = -cap;
-
-    bool have_x = zmk_mouse_ps2_is_non_zero_1d_movement(out_x);
-    bool have_y = zmk_mouse_ps2_is_non_zero_1d_movement(out_y);
-
-    if (have_x) input_report_rel(data->dev, INPUT_REL_X, out_x, !have_y, K_NO_WAIT);
-    if (have_y) input_report_rel(data->dev, INPUT_REL_Y, out_y, true, K_NO_WAIT);
+    if (mov_x) input_report_rel(data->dev, INPUT_REL_X, mov_x, (mov_y == 0), K_NO_WAIT);
+    if (mov_y) input_report_rel(data->dev, INPUT_REL_Y, mov_y, true, K_NO_WAIT);
 }
 
 void zmk_mouse_ps2_activity_click_buttons(bool button_l, bool button_m, bool button_r) {
