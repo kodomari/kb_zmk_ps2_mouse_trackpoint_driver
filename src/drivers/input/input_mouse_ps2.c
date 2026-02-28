@@ -421,12 +421,22 @@ void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, u
         return;
     }
 
-    // ========== 2) 座標値にState byteが混入していないか検証 ==========
-    if ((packet_x & 0x28) == 0x28 && packet_x < 0x80) {
-        zmk_mouse_ps2_activity_reset_packet_buffer();
-        skip_after_error = 1;  // ← 追加
-        return;
-    }
+// ========== 2) 座標値にState byteが混入していないか検証 ==========
+// State byteは下位3bitが0〜7（ボタン状態）なので、
+// 正確には 0x08, 0x09, ..., 0x0F, 0x18, 0x19, ..., 0x3F の範囲
+
+// より厳密な条件：bit3=1, bit4-7が特定パターン、bit0-2が小さい
+if (packet_x >= 0x08 && packet_x <= 0x3F && (packet_x & 0x07) <= 0x03) {
+    zmk_mouse_ps2_activity_reset_packet_buffer();
+    skip_after_error = 3;
+    return;
+}
+
+if (packet_y >= 0x08 && packet_y <= 0x3F && (packet_y & 0x07) <= 0x03) {
+    zmk_mouse_ps2_activity_reset_packet_buffer();
+    skip_after_error = 3;
+    return;
+}
     
     if ((packet_y & 0x28) == 0x28 && packet_y < 0x80) {
         zmk_mouse_ps2_activity_reset_packet_buffer();
