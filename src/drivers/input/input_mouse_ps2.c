@@ -428,37 +428,6 @@ void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, u
     }
 
     // ========== 3) 符号ビット整合性チェック（オプション） ==========
-    // State byteの符号ビットと座標値の符号が一致するか
-    int sx = (packet_state >> 4) & 1;  // State byteのX符号ビット
-    int sy = (packet_state >> 5) & 1;  // State byteのY符号ビット
-    
-    int vx_neg = (packet_x & 0x80) != 0;  // 座標値が負か
-    int vy_neg = (packet_y & 0x80) != 0;
-    
-    static uint8_t error_count = 0;
-    bool sign_mismatch = false;
-    
-    // 符号の不一致を検出（ただし0の場合は除外）
-    if (packet_x != 0 && sx != vx_neg) {
-        LOG_DBG("X sign mismatch: sx=%d vx_neg=%d (x=0x%02x)", sx, vx_neg, packet_x);
-        sign_mismatch = true;
-    }
-    if (packet_y != 0 && sy != vy_neg) {
-        LOG_DBG("Y sign mismatch: sy=%d vy_neg=%d (y=0x%02x)", sy, vy_neg, packet_y);
-        sign_mismatch = true;
-    }
-    
-    if (sign_mismatch) {
-        error_count++;
-        if (error_count > 5) {  // 閾値を高めに
-            LOG_WRN("Too many sign mismatches (%d), resetting buffer", error_count);
-            zmk_mouse_ps2_activity_reset_packet_buffer();
-            error_count = 0;
-        }
-        // 軽度のエラーは警告のみで処理続行
-    } else {
-        error_count = 0;
-    }
 
     // ========== 4) ボタンビットをマスク ==========
     packet_state &= ~0x07;
