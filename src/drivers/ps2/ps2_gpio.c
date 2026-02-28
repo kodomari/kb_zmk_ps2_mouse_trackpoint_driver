@@ -717,31 +717,26 @@ LOG_ERR("SCL=%d SDA=%d mode=%d rpos=%d wpos=%d",
 
 void ps2_gpio_read_abort(bool should_resend, char *reason) {
     struct ps2_gpio_data *data = &ps2_gpio_data;
-
-    if (should_resend == true) {
-        LOG_ERR("Aborting read with resend request on pos=%d: %s", data->cur_read_pos, reason);
-        LOG_PS2_INT("Aborting read with resend request.", NULL);
-    } else {
-        LOG_PS2_INT("Aborting read without resend request.", NULL);
-    }
-
+    
+    // ========== 修正：RESENDを送らない ==========
+    LOG_WRN("Aborting read on pos=%d: %s (RESEND disabled)", data->cur_read_pos, reason);
+    
     ps2_gpio_read_finish();
-
     k_work_cancel_delayable(&data->read_scl_timout);
-
-    if (should_resend == true) {
-        if (data->cur_read_try < PS2_GPIO_READ_MAX_RETRY) {
-
-            data->cur_read_try++;
-            ps2_gpio_send_cmd_resend();
-        } else {
-            LOG_ERR("Failed to read value %d times. Stopping asking the device "
-                    "to resend.",
-                    data->cur_read_try);
-
-            data->cur_read_try = 0;
-        }
-    }
+    
+    // RESEND送信を完全に無効化
+    // if (should_resend == true) {
+    //     if (data->cur_read_try < PS2_GPIO_READ_MAX_RETRY) {
+    //         data->cur_read_try++;
+    //         ps2_gpio_send_cmd_resend();  // ← これをコメントアウト
+    //     } else {
+    //         LOG_ERR("Failed to read value %d times.", data->cur_read_try);
+    //         data->cur_read_try = 0;
+    //     }
+    // }
+    
+    // リトライカウンタをリセット
+    data->cur_read_try = 0;
 }
 
 void ps2_gpio_read_process_received_byte(uint8_t byte) {
