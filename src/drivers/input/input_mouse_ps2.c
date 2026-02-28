@@ -432,15 +432,19 @@ void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, u
     static uint8_t error_count = 0;
     
     // Suspicious値検出（0x08, 0x18, 0x28, 0x38 など）
-    bool suspicious = false;
-    if ((packet_x & 0x08) != 0 && ((packet_x & 0xF0) == 0 || (packet_x & 0x20) != 0)) {
-        LOG_WRN("Suspicious x value: 0x%02x", packet_x);
-        suspicious = true;
-    }
-    if ((packet_y & 0x08) != 0 && ((packet_y & 0xF0) == 0 || (packet_y & 0x20) != 0)) {
-        LOG_WRN("Suspicious y value: 0x%02x", packet_y);
-        suspicious = true;
-    }
+// State byteっぽい値の検出
+// bit3=1 かつ bit6,7が両方0の場合（0x00-0x3f の範囲）
+bool suspicious = false;
+
+if ((packet_x & 0x08) && (packet_x & 0xC0) == 0) {
+    LOG_WRN("Suspicious x value: 0x%02x", packet_x);
+    suspicious = true;
+}
+
+if ((packet_y & 0x08) && (packet_y & 0xC0) == 0) {
+    LOG_WRN("Suspicious y value: 0x%02x", packet_y);
+    suspicious = true;
+}
     
     if (suspicious) {
         error_count++;
