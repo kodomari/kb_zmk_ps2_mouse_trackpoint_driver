@@ -120,8 +120,8 @@ LOG_MODULE_REGISTER(ps2_gpio);
 // little extra time.
 // #define PS2_GPIO_TIMEOUT_READ_SCL K_USEC(PS2_GPIO_TIMING_SCL_CYCLE_MAX + 50)
 // #define PS2_GPIO_TIMEOUT_WRITE_SCL K_USEC(PS2_GPIO_TIMING_SCL_CYCLE_MAX + 50)
-#define PS2_GPIO_TIMEOUT_READ_SCL  K_USEC(800)
-#define PS2_GPIO_TIMEOUT_WRITE_SCL K_USEC(800)
+#define PS2_GPIO_TIMEOUT_READ_SCL  K_USEC(2000)
+#define PS2_GPIO_TIMEOUT_WRITE_SCL K_USEC(2000)
 // But after inhibiting the clock line, sometimes clocks take a little longer
 // to start. So we allow a bit more time for the first write clock.
 #define PS2_GPIO_TIMEOUT_WRITE_SCL_START K_USEC(PS2_GPIO_TIMING_SCL_INHIBITION_RESP_MAX)
