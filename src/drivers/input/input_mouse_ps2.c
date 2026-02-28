@@ -419,8 +419,45 @@ void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, u
                 ov_x, ov_y, packet_state, packet_x, packet_y);
         return;
     }
+    // State byte の検証
+    if ((packet_state & 0x08) == 0) {
+        LOG_WRN("Invalid state: bit3=0, dropping (st=%02x)", packet_state);
+        return;
+    }
+
+    int ov_x = (packet_state >> 6) & 1;
+    int ov_y = (packet_state >> 7) & 1;
     
+    if (ov_x || ov_y) {
+        LOG_WRN("Overflow detected, dropping");
+        return;
+    }
+
+    // ========== 新規追加：座標値の検証 ==========
+    // x, y が state バイトっぽい値（bit3=1）なら同期ズレ
+    if ((packet_x & 0x08) && (packet_x & 0xF0) == 0) {
+        LOG_WRN("Suspicious x value (looks like state byte): 0x%02x, dropping", packet_x);
+        return;
+    }
+    
+    if ((packet_y & 0x08) && (packet_y & 0xF0) == 0) {
+        LOG_WRN("Suspicious y value (looks like state byte): 0x%02x, dropping", packet_y);
+        return;
+    }
+        
     packet_state &= ~0x07;  
+
+        // パケットをパース
+    struct zmk_mouse_ps2_packet packet;
+    packet = zmk_mouse_ps2_activity_parse_packet_buffer(...);
+    
+    // 異常な移動量を検出（閾値を厳しく）
+    if (abs(packet.mov_x) > 10 || abs(packet.mov_y) > 10) {
+        LOG_WRN("Abnormal movement: mov_x=%d mov_y=%d, dropping", 
+                packet.mov_x, packet.mov_y);
+        return;
+    }
+
     // Bit0(L), Bit1(R), Bit2(M) を全部0に固定
     // 以降、packet_stateから mov_x/mov_y/button を解釈しても
     // ボタンは常に 0 扱いになる
@@ -428,6 +465,27 @@ void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, u
     struct zmk_mouse_ps2_packet packet;
     packet = zmk_mouse_ps2_activity_parse_packet_buffer(packet_mode, packet_state, packet_x,
                                                         packet_y, packet_extra);
+
+        if (packet.overflow_x || packet.overflow_y) {
+        LOG_WRN("Dropping PS/2 packet: overflow ov=%d,%d (st=%02x x=%02x y=%02x)",
+                packet.overflow_x, packet.overflow_y, packet_state, packet_x, packet_y);
+        zmk_mouse_ps2_activity_reset_packet_buffer();
+        return;
+    }
+
+    if (packet.mov_x == -256 || packet.mov_y == -256) {
+        LOG_WRN("Dropping PS/2 packet: mov_x=%d mov_y=%d (st=%02x x=%02x y=%02x)",
+                packet.mov_x, packet.mov_y, packet_state, packet_x, packet_y);
+        zmk_mouse_ps2_activity_reset_packet_buffer();
+        return;
+    }
+
+    if (abs(packet.mov_x) >= 32 || abs(packet.mov_y) >= 32) {
+        LOG_WRN("Dropping PS/2 packet: mov_x=%d mov_y=%d (st=%02x x=%02x y=%02x)",
+                packet.mov_x, packet.mov_y, packet_state, packet_x, packet_y);
+        zmk_mouse_ps2_activity_reset_packet_buffer();
+        return;
+    }
 /* 壊れパケット対策：-256 は「符号bitだけ立って下位8bitが0」の典型 */
 if (packet.mov_x == -256 || packet.mov_y == -256) {
     LOG_WRN("Dropping PS/2 packet: mov_x=%d mov_y=%d (st=%02x x=%02x y=%02x)",
