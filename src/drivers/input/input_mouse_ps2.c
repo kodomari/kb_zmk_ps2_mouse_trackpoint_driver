@@ -405,6 +405,23 @@ void zmk_mouse_ps2_activity_reset_packet_buffer() {
     memset(data->packet_buffer, 0x0, sizeof(data->packet_buffer));
 }
 
+// ========== 1) 加速関数を定義（process_cmd関数の前） ==========
+static int apply_acceleration(int mov) {
+    int abs_mov = abs(mov);
+    int sign = (mov > 0) ? 1 : -1;
+    int result;
+    
+    if (abs_mov <= 3) {
+        result = abs_mov;
+    } else if (abs_mov <= 10) {
+        result = abs_mov + (abs_mov - 3) / 2;
+    } else {
+        result = abs_mov * 2 - 10;
+    }
+    
+    return result * sign;
+}
+
 void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, uint8_t packet_state,
                                         uint8_t packet_x, uint8_t packet_y, uint8_t packet_extra) {
     struct zmk_mouse_ps2_data *data = &zmk_mouse_ps2_data;
@@ -447,7 +464,11 @@ void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, u
     }
 #endif
 
-    zmk_mouse_ps2_activity_move_mouse(packet.mov_x, packet.mov_y);
+    // ========== 最後：加速してマウス移動 ==========
+    int accel_x = apply_acceleration(packet.mov_x);
+    int accel_y = apply_acceleration(packet.mov_y);
+    
+    zmk_mouse_ps2_activity_move_mouse(accel_x, accel_y);
     zmk_mouse_ps2_activity_click_buttons(packet.button_l, packet.button_m, packet.button_r);
 
     data->prev_packet = packet;
