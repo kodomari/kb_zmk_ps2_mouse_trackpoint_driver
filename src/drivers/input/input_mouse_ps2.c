@@ -408,7 +408,7 @@ void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, u
     
     // ========== 1) State byte の基本検証 ==========
     if ((packet_state & 0x08) == 0) {
-        LOG_WRN("Invalid state: bit3=0, resetting buffer (st=%02x)", packet_state);
+        LOG_WRN("Invalid state: bit3=0, resetting buffer");
         zmk_mouse_ps2_activity_reset_packet_buffer();
         return;
     }
@@ -423,41 +423,42 @@ void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, u
         return;
     }
 
-    // 片方だけのoverflowは警告のみ
     if (ov_x || ov_y) {
         LOG_DBG("Single overflow: ov_x=%d ov_y=%d (processing anyway)", ov_x, ov_y);
     }
 
-    // ========== 3) 座標値の検証（統合版） ==========
+    // ========== 3) 符号ビット整合性チェック（オプション） ==========
+    // State byteの符号ビットと座標値の符号が一致するか
+    int sx = (packet_state >> 4) & 1;  // State byteのX符号ビット
+    int sy = (packet_state >> 5) & 1;  // State byteのY符号ビット
+    
+    int vx_neg = (packet_x & 0x80) != 0;  // 座標値が負か
+    int vy_neg = (packet_y & 0x80) != 0;
+    
     static uint8_t error_count = 0;
+    bool sign_mismatch = false;
     
-    // Suspicious値検出（0x08, 0x18, 0x28, 0x38 など）
-// State byteっぽい値の検出
-// bit3=1 かつ bit6,7が両方0の場合（0x00-0x3f の範囲）
-bool suspicious = false;
-
-if ((packet_x & 0x08) && (packet_x & 0xC0) == 0) {
-    LOG_WRN("Suspicious x value: 0x%02x", packet_x);
-    suspicious = true;
-}
-
-if ((packet_y & 0x08) && (packet_y & 0xC0) == 0) {
-    LOG_WRN("Suspicious y value: 0x%02x", packet_y);
-    suspicious = true;
-}
+    // 符号の不一致を検出（ただし0の場合は除外）
+    if (packet_x != 0 && sx != vx_neg) {
+        LOG_DBG("X sign mismatch: sx=%d vx_neg=%d (x=0x%02x)", sx, vx_neg, packet_x);
+        sign_mismatch = true;
+    }
+    if (packet_y != 0 && sy != vy_neg) {
+        LOG_DBG("Y sign mismatch: sy=%d vy_neg=%d (y=0x%02x)", sy, vy_neg, packet_y);
+        sign_mismatch = true;
+    }
     
-    if (suspicious) {
+    if (sign_mismatch) {
         error_count++;
-        if (error_count > 3) {
-            LOG_ERR("Too many errors (%d), forcing buffer reset", error_count);
+        if (error_count > 5) {  // 閾値を高めに
+            LOG_WRN("Too many sign mismatches (%d), resetting buffer", error_count);
             zmk_mouse_ps2_activity_reset_packet_buffer();
             error_count = 0;
         }
-        return;
+        // 軽度のエラーは警告のみで処理続行
+    } else {
+        error_count = 0;
     }
-
-    // 正常パケット受信時はエラーカウントをリセット
-    error_count = 0;
 
     // ========== 4) ボタンビットをマスク ==========
     packet_state &= ~0x07;
@@ -469,13 +470,12 @@ if ((packet_y & 0x08) && (packet_y & 0xC0) == 0) {
 
     // ========== 6) パース後の異常値検出 ==========
     if (packet.mov_x == -256 || packet.mov_y == -256) {
-        LOG_WRN("Dropping PS/2 packet: mov=-256 (st=%02x x=%02x y=%02x)",
-                packet_state, packet_x, packet_y);
+        LOG_WRN("Dropping: mov=-256");
         return;
     }
 
     if (abs(packet.mov_x) > 100 || abs(packet.mov_y) > 100) {
-        LOG_WRN("Abnormal movement: mov=%d,%d, dropping", packet.mov_x, packet.mov_y);
+        LOG_WRN("Abnormal movement: mov=%d,%d", packet.mov_x, packet.mov_y);
         return;
     }
 
