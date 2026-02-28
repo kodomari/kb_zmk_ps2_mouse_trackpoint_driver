@@ -448,7 +448,8 @@ void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, u
     packet_state &= ~0x07;
     
     struct zmk_mouse_ps2_packet packet;
-    packet = zmk_mouse_ps2_activity_parse_packet_buffer(...);
+packet = zmk_mouse_ps2_activity_parse_packet_buffer(packet_mode, packet_state, packet_x,
+                                                    packet_y, packet_extra);
     
     if (packet.mov_x == -256 || packet.mov_y == -256) {
         skip_after_error = 2;  // ← 追加
