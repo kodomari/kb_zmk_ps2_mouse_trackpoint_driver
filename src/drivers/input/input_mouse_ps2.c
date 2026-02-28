@@ -404,6 +404,22 @@ void zmk_mouse_ps2_activity_reset_packet_buffer() {
 
 void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, uint8_t packet_state,
                                         uint8_t packet_x, uint8_t packet_y, uint8_t packet_extra) {
+    // 1) State byte の基本検証（bit3 は必ず1）
+    if ((packet_state & 0x08) == 0) {
+        LOG_WRN("Invalid state: bit3=0, dropping (st=%02x)", packet_state);
+        return;
+    }
+
+    // 2) Overflow 検出（どちらか1つでもONなら廃棄）
+    int ov_x = (packet_state >> 6) & 1;
+    int ov_y = (packet_state >> 7) & 1;
+    
+    if (ov_x || ov_y) {
+        LOG_WRN("Overflow detected (ov_x=%d ov_y=%d), dropping (st=%02x x=%02x y=%02x)",
+                ov_x, ov_y, packet_state, packet_x, packet_y);
+        return;
+    }
+    
     packet_state &= ~0x07;  
     // Bit0(L), Bit1(R), Bit2(M) を全部0に固定
     // 以降、packet_stateから mov_x/mov_y/button を解釈しても
@@ -524,67 +540,10 @@ static bool zmk_mouse_ps2_is_non_zero_1d_movement(int16_t speed) { return speed 
 void zmk_mouse_ps2_activity_move_mouse(int16_t mov_x, int16_t mov_y) {
     struct zmk_mouse_ps2_data *data = &zmk_mouse_ps2_data;
 
-    /* -------------------------
-     * 1) 破損っぽい値の安全弁（念のため）
-     *   ※本来は process_cmd 側で drop が本筋だが、
-     *     ここにも最低限のガードを入れておくと事故が減る
-     * ------------------------- */
-    if (mov_x == -256 || mov_y == -256) {
-        return;
-    }
-
-    /* -------------------------
-     * 2) ゲイン（感度）
-     *   - まずは単純に落とすのが一番効く
-     *   - gain_div を大きくすると鈍くなる
-     * ------------------------- */
-    const int16_t gain_div = 2;      // 2=0.5倍 / 3=0.33倍 / 4=0.25倍
-    mov_x /= gain_div;
-    mov_y /= gain_div;
-
-    /* -------------------------
-     * 3) 入力デッドゾーン（ドリフト止め）
-     * ------------------------- */
-    const int16_t dz = 2;            // 2〜5あたりで調整
-    if (mov_x > -dz && mov_x < dz) mov_x = 0;
-    if (mov_y > -dz && mov_y < dz) mov_y = 0;
-
-    /* -------------------------
-     * 4) 任意：軽い平滑（IIR）
-     *   - ノイズがまだ目立つ時だけON
-     *   - ONにすると“止まりが悪くなる”ことがあるので、
-     *     dz と併用する前提
-     * ------------------------- */
-#if 1
-    // Q8 固定小数で IIR: new = (7/8)*old + (1/8)*input
-    static int32_t fx = 0, fy = 0;
-    fx = (fx * 7 + ((int32_t)mov_x << 8)) / 8;
-    fy = (fy * 7 + ((int32_t)mov_y << 8)) / 8;
-
-    // 丸めて戻す
-    mov_x = (int16_t)((fx + (fx >= 0 ? 128 : -128)) >> 8);
-    mov_y = (int16_t)((fy + (fy >= 0 ? 128 : -128)) >> 8);
-
-    // 出力がゼロなら内部状態もゼロにスナップ（ドリフト残留を切る）
-    const int16_t dz_out = 1;        // 0〜2で調整
-    if (mov_x > -dz_out && mov_x < dz_out) { mov_x = 0; fx = 0; }
-    if (mov_y > -dz_out && mov_y < dz_out) { mov_y = 0; fy = 0; }
-#endif
-
-    /* -------------------------
-     * 5) クリップ（ジャンプ抑制）
-     * ------------------------- */
-    const int16_t cap = 40;          // 40〜80で調整
-    mov_x = CLAMP(mov_x, -cap, cap);
-    mov_y = CLAMP(mov_y, -cap, cap);
-
-    /* -------------------------
-     * 6) 出力
-     * ------------------------- */
-    if (mov_x) {
+    if (mov_x != 0) {
         input_report_rel(data->dev, INPUT_REL_X, mov_x, (mov_y == 0), K_NO_WAIT);
     }
-    if (mov_y) {
+    if (mov_y != 0) {
         input_report_rel(data->dev, INPUT_REL_Y, mov_y, true, K_NO_WAIT);
     }
 }
