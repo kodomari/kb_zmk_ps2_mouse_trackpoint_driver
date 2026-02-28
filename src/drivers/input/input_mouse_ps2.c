@@ -404,141 +404,80 @@ void zmk_mouse_ps2_activity_reset_packet_buffer() {
 
 void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, uint8_t packet_state,
                                         uint8_t packet_x, uint8_t packet_y, uint8_t packet_extra) {
-    // 1) State byte の基本検証（bit3 は必ず1）
+    struct zmk_mouse_ps2_data *data = &zmk_mouse_ps2_data;
+    
+    // ========== 1) State byte の基本検証 ==========
     if ((packet_state & 0x08) == 0) {
         LOG_WRN("Invalid state: bit3=0, dropping (st=%02x)", packet_state);
         return;
     }
 
-    // 2) Overflow 検出（どちらか1つでもONなら廃棄）
+    // ========== 2) Overflow 検出 ==========
     int ov_x = (packet_state >> 6) & 1;
     int ov_y = (packet_state >> 7) & 1;
     
     if (ov_x || ov_y) {
-        LOG_WRN("Overflow detected (ov_x=%d ov_y=%d), dropping (st=%02x x=%02x y=%02x)",
-                ov_x, ov_y, packet_state, packet_x, packet_y);
-        return;
-    }
-    // State byte の検証
-    if ((packet_state & 0x08) == 0) {
-        LOG_WRN("Invalid state: bit3=0, dropping (st=%02x)", packet_state);
+        LOG_WRN("Overflow detected (ov_x=%d ov_y=%d), dropping", ov_x, ov_y);
         return;
     }
 
-    int ov_x = (packet_state >> 6) & 1;
-    int ov_y = (packet_state >> 7) & 1;
-    
-    if (ov_x || ov_y) {
-        LOG_WRN("Overflow detected, dropping");
-        return;
-    }
-
-    // ========== 新規追加：座標値の検証 ==========
-    // x, y が state バイトっぽい値（bit3=1）なら同期ズレ
+    // ========== 3) 座標値の検証（同期ズレ検出） ==========
     if ((packet_x & 0x08) && (packet_x & 0xF0) == 0) {
-        LOG_WRN("Suspicious x value (looks like state byte): 0x%02x, dropping", packet_x);
+        LOG_WRN("Suspicious x value: 0x%02x, dropping", packet_x);
         return;
     }
     
     if ((packet_y & 0x08) && (packet_y & 0xF0) == 0) {
-        LOG_WRN("Suspicious y value (looks like state byte): 0x%02x, dropping", packet_y);
-        return;
-    }
-        
-    packet_state &= ~0x07;  
-
-        // パケットをパース
-    struct zmk_mouse_ps2_packet packet;
-    packet = zmk_mouse_ps2_activity_parse_packet_buffer(...);
-    
-    // 異常な移動量を検出（閾値を厳しく）
-    if (abs(packet.mov_x) > 10 || abs(packet.mov_y) > 10) {
-        LOG_WRN("Abnormal movement: mov_x=%d mov_y=%d, dropping", 
-                packet.mov_x, packet.mov_y);
+        LOG_WRN("Suspicious y value: 0x%02x, dropping", packet_y);
         return;
     }
 
-    // Bit0(L), Bit1(R), Bit2(M) を全部0に固定
-    // 以降、packet_stateから mov_x/mov_y/button を解釈しても
-    // ボタンは常に 0 扱いになる
-    struct zmk_mouse_ps2_data *data = &zmk_mouse_ps2_data;
+    // ========== 4) ボタンビットをマスク ==========
+    packet_state &= ~0x07;
+
+    // ========== 5) パケットをパース ==========
     struct zmk_mouse_ps2_packet packet;
     packet = zmk_mouse_ps2_activity_parse_packet_buffer(packet_mode, packet_state, packet_x,
                                                         packet_y, packet_extra);
 
-        if (packet.overflow_x || packet.overflow_y) {
-        LOG_WRN("Dropping PS/2 packet: overflow ov=%d,%d (st=%02x x=%02x y=%02x)",
-                packet.overflow_x, packet.overflow_y, packet_state, packet_x, packet_y);
-        zmk_mouse_ps2_activity_reset_packet_buffer();
-        return;
-    }
-
+    // ========== 6) パース後の異常値検出 ==========
+    // -256 検出
     if (packet.mov_x == -256 || packet.mov_y == -256) {
-        LOG_WRN("Dropping PS/2 packet: mov_x=%d mov_y=%d (st=%02x x=%02x y=%02x)",
-                packet.mov_x, packet.mov_y, packet_state, packet_x, packet_y);
-        zmk_mouse_ps2_activity_reset_packet_buffer();
+        LOG_WRN("Dropping PS/2 packet: mov=-256 (st=%02x x=%02x y=%02x)",
+                packet_state, packet_x, packet_y);
         return;
     }
 
-    if (abs(packet.mov_x) >= 32 || abs(packet.mov_y) >= 32) {
-        LOG_WRN("Dropping PS/2 packet: mov_x=%d mov_y=%d (st=%02x x=%02x y=%02x)",
-                packet.mov_x, packet.mov_y, packet_state, packet_x, packet_y);
-        zmk_mouse_ps2_activity_reset_packet_buffer();
+    // 異常な大きさの移動量を検出
+    if (abs(packet.mov_x) > 10 || abs(packet.mov_y) > 10) {
+        LOG_WRN("Abnormal movement: mov=%d,%d, dropping", packet.mov_x, packet.mov_y);
         return;
     }
-/* 壊れパケット対策：-256 は「符号bitだけ立って下位8bitが0」の典型 */
-if (packet.mov_x == -256 || packet.mov_y == -256) {
-    LOG_WRN("Dropping PS/2 packet: mov_x=%d mov_y=%d (st=%02x x=%02x y=%02x)",
-            packet.mov_x, packet.mov_y, packet_state, packet_x, packet_y);
-    return;
-}
+
+    // ========== 7) デバッグログ ==========
+    LOG_INF("PS2: st=%02x x=%02x y=%02x ex=%02x | sx=%d sy=%d | mov=%d,%d ov=%d,%d",
+            packet_state, packet_x, packet_y, packet_extra,
+            (packet_state >> 4) & 1, (packet_state >> 5) & 1,
+            packet.mov_x, packet.mov_y,
+            packet.overflow_x, packet.overflow_y);
+
+    // ========== 8) デルタチェック（既存のコード） ==========
     int x_delta = abs(data->prev_packet.mov_x - packet.mov_x);
     int y_delta = abs(data->prev_packet.mov_y - packet.mov_y);
-    
-LOG_INF("PS2: st=%02x x=%02x y=%02x ex=%02x | sx=%d sy=%d | mov=%d,%d ov=%d,%d",
-        packet_state, packet_x, packet_y, packet_extra,
-        (packet_state >> 4) & 1, (packet_state >> 5) & 1,
-        packet.mov_x, packet.mov_y,
-        packet.overflow_x, packet.overflow_y);
-/*    LOG_DBG("Got mouse activity cmd "
-            "(mov_x=%d, mov_y=%d, o_x=%d, o_y=%d, scroll=%d, "
-            "b_l=%d, b_m=%d, b_r=%d) and ("
-            "x_delta=%d, y_delta=%d)",
-            packet.mov_x, packet.mov_y, packet.overflow_x, packet.overflow_y, packet.scroll,
-            packet.button_l, packet.button_m, packet.button_r, x_delta, y_delta);
-*/
-    
+
 #if IS_ENABLED(CONFIG_ZMK_INPUT_MOUSE_PS2_ENABLE_ERROR_MITIGATION)
-    if (packet.overflow_x == 1 && packet.overflow_y == 1) {
-//        LOG_WRN("Detected overflow in both x and y. "
-//                "Probably mistransmission. Aborting...");
-
-        zmk_mouse_ps2_activity_abort_cmd("Overflow in both x and y");
-        return;
-    }
-
-    // If the mouse exceeds the allowed threshold of movement, it's probably
-    // a mistransmission or misalignment.
-    // But we only do this check if there was prior movement that wasn't
-    // reset in `zmk_mouse_ps2_activity_packet_timout`.
     if ((packet.mov_x != 0 && packet.mov_y != 0) && (x_delta > 150 || y_delta > 150)) {
-//        LOG_WRN("Detected malformed packet with "
-//                "(mov_x=%d, mov_y=%d, o_x=%d, o_y=%d, scroll=%d, "
-//                "b_l=%d, b_m=%d, b_r=%d) and ("
-//                "x_delta=%d, y_delta=%d)",
-//                packet.mov_x, packet.mov_y, packet.overflow_x, packet.overflow_y, packet.scroll,
-//                packet.button_l, packet.button_m, packet.button_r, x_delta, y_delta);
         zmk_mouse_ps2_activity_abort_cmd("Exceeds movement threshold.");
         return;
     }
 #endif
 
+    // ========== 9) マウス移動を実行 ==========
     zmk_mouse_ps2_activity_move_mouse(packet.mov_x, packet.mov_y);
-    // zmk_mouse_ps2_activity_click_buttons(packet.button_l, packet.button_m, packet.button_r);
 
+    // ========== 10) 前回のパケットを保存 ==========
     data->prev_packet = packet;
 }
-
 struct zmk_mouse_ps2_packet
 zmk_mouse_ps2_activity_parse_packet_buffer(zmk_mouse_ps2_packet_mode packet_mode,
                                            uint8_t packet_state, uint8_t packet_x, uint8_t packet_y,
