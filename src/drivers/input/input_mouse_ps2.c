@@ -449,7 +449,7 @@ void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, u
     }
 
     // 異常な大きさの移動量を検出
-    if (abs(packet.mov_x) > 10 || abs(packet.mov_y) > 10) {
+    if (abs(packet.mov_x) > 50 || abs(packet.mov_y) > 50) {
         LOG_WRN("Abnormal movement: mov=%d,%d, dropping", packet.mov_x, packet.mov_y);
         return;
     }
@@ -536,7 +536,11 @@ static bool zmk_mouse_ps2_is_non_zero_1d_movement(int16_t speed) { return speed 
 
 void zmk_mouse_ps2_activity_move_mouse(int16_t mov_x, int16_t mov_y) {
     struct zmk_mouse_ps2_data *data = &zmk_mouse_ps2_data;
-
+    
+    // ========== 上下反転 ==========
+    mov_y = -mov_y;
+    
+    // 既存のコード
     if (mov_x != 0) {
         input_report_rel(data->dev, INPUT_REL_X, mov_x, (mov_y == 0), K_NO_WAIT);
     }
