@@ -413,7 +413,24 @@ void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, u
         return;
     }
 
-    // ========== 2) Overflow 検出 ==========
+    // ========== 2) 座標値にState byteが混入していないか検証 ==========
+    // bit3=1 かつ bit5=1 の値は State byte の可能性が高い
+    // 0x08, 0x18, 0x28, 0x38 など
+    
+    // ただし、大きな値 (>= 0x80) は負の座標として正常
+    if ((packet_x & 0x28) == 0x28 && packet_x < 0x80) {
+        LOG_WRN("Suspicious x: 0x%02x (looks like state byte), resetting", packet_x);
+        zmk_mouse_ps2_activity_reset_packet_buffer();
+        return;
+    }
+    
+    if ((packet_y & 0x28) == 0x28 && packet_y < 0x80) {
+        LOG_WRN("Suspicious y: 0x%02x (looks like state byte), resetting", packet_y);
+        zmk_mouse_ps2_activity_reset_packet_buffer();
+        return;
+    }
+
+    // ========== 3) Overflow 検出 ==========
     int ov_x = (packet_state >> 6) & 1;
     int ov_y = (packet_state >> 7) & 1;
 
@@ -424,10 +441,8 @@ void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, u
     }
 
     if (ov_x || ov_y) {
-        LOG_DBG("Single overflow: ov_x=%d ov_y=%d (processing anyway)", ov_x, ov_y);
+        LOG_DBG("Single overflow: ov_x=%d ov_y=%d", ov_x, ov_y);
     }
-
-    // ========== 3) 符号ビット整合性チェック（オプション） ==========
 
     // ========== 4) ボタンビットをマスク ==========
     packet_state &= ~0x07;
