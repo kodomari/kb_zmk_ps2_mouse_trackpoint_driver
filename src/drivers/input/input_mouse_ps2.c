@@ -1221,7 +1221,7 @@ int zmk_mouse_ps2_tp_sensitivity_get(uint8_t *sensitivity) {
 
 int zmk_mouse_ps2_tp_sensitivity_set(int sensitivity) {
     struct zmk_mouse_ps2_data *data = &zmk_mouse_ps2_data;
-
+    
     if (sensitivity < MOUSE_PS2_CMD_TP_SET_SENSITIVITY_MIN ||
         sensitivity > MOUSE_PS2_CMD_TP_SET_SENSITIVITY_MAX) {
         LOG_ERR("Invalid sensitivity value %d. Min: %d; Max: %d", sensitivity,
@@ -1229,21 +1229,40 @@ int zmk_mouse_ps2_tp_sensitivity_set(int sensitivity) {
         return 1;
     }
 
+    // ========== リトライロジック ==========
+    const int MAX_RETRIES = 3;
+    const int RETRY_DELAY_MS = 50;
+    
     uint8_t arg = sensitivity;
-
-    struct zmk_mouse_ps2_send_cmd_resp resp = zmk_mouse_ps2_send_cmd(
-        MOUSE_PS2_CMD_TP_SET_SENSITIVITY, sizeof(MOUSE_PS2_CMD_TP_SET_SENSITIVITY), &arg,
-        MOUSE_PS2_CMD_TP_SET_SENSITIVITY_RESP_LEN, true);
-    if (resp.err) {
-        LOG_ERR("Could not set sensitivity to %d", sensitivity);
-        return resp.err;
+    struct zmk_mouse_ps2_send_cmd_resp resp = {0};
+    
+    for (int i = 0; i < MAX_RETRIES; i++) {
+        if (i > 0) {
+            LOG_WRN("Retrying sensitivity setting (attempt %d/%d)", i+1, MAX_RETRIES);
+            k_msleep(RETRY_DELAY_MS);
+        }
+        
+        resp = zmk_mouse_ps2_send_cmd(
+            MOUSE_PS2_CMD_TP_SET_SENSITIVITY, sizeof(MOUSE_PS2_CMD_TP_SET_SENSITIVITY), &arg,
+            MOUSE_PS2_CMD_TP_SET_SENSITIVITY_RESP_LEN, true);
+        
+        if (resp.err == 0) {
+            // 成功
+            data->tp_sensitivity = sensitivity;
+            LOG_INF("Successfully set TP sensitivity to %d", sensitivity);
+            return 0;
+        }
+        
+        LOG_WRN("Failed to set sensitivity (attempt %d/%d): %s", 
+                i+1, MAX_RETRIES, resp.err_msg);
     }
-
-    data->tp_sensitivity = sensitivity;
-
-    LOG_INF("Successfully set TP sensitivity to %d", sensitivity);
-
-    return 0;
+    
+    // ========== 全リトライ失敗 ==========
+    LOG_WRN("Could not set sensitivity to %d after %d attempts, using default", 
+            sensitivity, MAX_RETRIES);
+    
+    // エラーでも処理は続行（デフォルト値で動作）
+    return resp.err;
 }
 
 int zmk_mouse_ps2_tp_sensitivity_change(int amount) {
