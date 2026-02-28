@@ -413,14 +413,20 @@ void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, u
     }
 
     // ========== 2) Overflow 検出 ==========
-    int ov_x = (packet_state >> 6) & 1;
-    int ov_y = (packet_state >> 7) & 1;
-    
-    if (ov_x || ov_y) {
-        LOG_WRN("Overflow detected (ov_x=%d ov_y=%d), dropping", ov_x, ov_y);
-        return;
-    }
+// Overflow 検出（両方ONの場合のみ捨てる）
+int ov_x = (packet_state >> 6) & 1;
+int ov_y = (packet_state >> 7) & 1;
 
+if (ov_x && ov_y) {
+    // 両方overflow = 確実にエラー
+    LOG_WRN("Both overflow detected, dropping");
+    return;
+}
+
+// 片方だけのoverflowは警告のみ（処理は続行）
+if (ov_x || ov_y) {
+    LOG_DBG("Single overflow: ov_x=%d ov_y=%d (processing anyway)", ov_x, ov_y);
+}
     // ========== 3) 座標値の検証（同期ズレ検出） ==========
     if ((packet_x & 0x08) && (packet_x & 0xF0) == 0) {
         LOG_WRN("Suspicious x value: 0x%02x, dropping", packet_x);
@@ -449,7 +455,7 @@ void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, u
     }
 
     // 異常な大きさの移動量を検出
-    if (abs(packet.mov_x) > 50 || abs(packet.mov_y) > 50) {
+    if (abs(packet.mov_x) > 100 || abs(packet.mov_y) > 100) {
         LOG_WRN("Abnormal movement: mov=%d,%d, dropping", packet.mov_x, packet.mov_y);
         return;
     }
