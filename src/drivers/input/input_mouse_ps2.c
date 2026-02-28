@@ -411,63 +411,39 @@ void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, u
     
     if (skip_after_error > 0) {
         skip_after_error--;
-        return;  // エラー後3パケットをスキップ
+        return;
     }
     
-    // ========== 1) State byte の基本検証 ==========
     if ((packet_state & 0x08) == 0) {
         zmk_mouse_ps2_activity_reset_packet_buffer();
-        skip_after_error = 1;  // ← 追加
+        skip_after_error = 3;  // ← 3に戻す
         return;
     }
 
-// ========== 2) 座標値にState byteが混入していないか検証 ==========
-// State byteは下位3bitが0〜7（ボタン状態）なので、
-// 正確には 0x08, 0x09, ..., 0x0F, 0x18, 0x19, ..., 0x3F の範囲
+    // X/Y検証はコメントアウト済み
 
-// より厳密な条件：bit3=1, bit4-7が特定パターン、bit0-2が小さい
-if (packet_x >= 0x08 && packet_x <= 0x3F && (packet_x & 0x07) <= 0x03) {
-    zmk_mouse_ps2_activity_reset_packet_buffer();
-    skip_after_error = 3;
-    return;
-}
-
-if (packet_y >= 0x08 && packet_y <= 0x3F && (packet_y & 0x07) <= 0x03) {
-    zmk_mouse_ps2_activity_reset_packet_buffer();
-    skip_after_error = 3;
-    return;
-}
-    
-    if ((packet_y & 0x28) == 0x28 && packet_y < 0x80) {
-        zmk_mouse_ps2_activity_reset_packet_buffer();
-        skip_after_error = 1;  // ← 追加
-        return;
-    }
-
-    // ========== 3) Overflow 検出 ==========
     int ov_x = (packet_state >> 6) & 1;
     int ov_y = (packet_state >> 7) & 1;
 
     if (ov_x && ov_y) {
         zmk_mouse_ps2_activity_reset_packet_buffer();
-        skip_after_error = 1;  // ← 追加
+        skip_after_error = 3;  // ← 3に戻す
         return;
     }
 
-    // ========== 既存のコード（変更なし） ==========
     packet_state &= ~0x07;
     
     struct zmk_mouse_ps2_packet packet;
-packet = zmk_mouse_ps2_activity_parse_packet_buffer(packet_mode, packet_state, packet_x,
-                                                    packet_y, packet_extra);
-    
+    packet = zmk_mouse_ps2_activity_parse_packet_buffer(packet_mode, packet_state, packet_x,
+                                                        packet_y, packet_extra);
+
     if (packet.mov_x == -256 || packet.mov_y == -256) {
-        skip_after_error = 1;  // ← 追加
+        skip_after_error = 2;  // ← 2に戻す
         return;
     }
     
     if (abs(packet.mov_x) > 100 || abs(packet.mov_y) > 100) {
-        skip_after_error = 1;  // ← 追加
+        skip_after_error = 2;  // ← 2に戻す
         return;
     }
 
@@ -477,7 +453,7 @@ packet = zmk_mouse_ps2_activity_parse_packet_buffer(packet_mode, packet_state, p
     
     if ((packet.mov_x != 0 && packet.mov_y != 0) && (x_delta > 150 || y_delta > 150)) {
         zmk_mouse_ps2_activity_abort_cmd("Exceeds movement threshold.");
-        skip_after_error = 1;  // ← 追加
+        skip_after_error = 2;  // ← 2に戻す
         return;
     }
 #endif
