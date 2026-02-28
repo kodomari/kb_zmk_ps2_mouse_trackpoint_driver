@@ -406,85 +406,54 @@ void zmk_mouse_ps2_activity_process_cmd(zmk_mouse_ps2_packet_mode packet_mode, u
                                         uint8_t packet_x, uint8_t packet_y, uint8_t packet_extra) {
     struct zmk_mouse_ps2_data *data = &zmk_mouse_ps2_data;
     
-    // ========== 1) State byte の基本検証 ==========
+    // ========== 検証（ログなし） ==========
     if ((packet_state & 0x08) == 0) {
-        LOG_WRN("Invalid state: bit3=0, resetting buffer");
         zmk_mouse_ps2_activity_reset_packet_buffer();
         return;
     }
 
-    // ========== 2) 座標値にState byteが混入していないか検証 ==========
-    // bit3=1 かつ bit5=1 の値は State byte の可能性が高い
-    // 0x08, 0x18, 0x28, 0x38 など
-    
-    // ただし、大きな値 (>= 0x80) は負の座標として正常
     if ((packet_x & 0x28) == 0x28 && packet_x < 0x80) {
-        LOG_WRN("Suspicious x: 0x%02x (looks like state byte), resetting", packet_x);
         zmk_mouse_ps2_activity_reset_packet_buffer();
         return;
     }
     
     if ((packet_y & 0x28) == 0x28 && packet_y < 0x80) {
-        LOG_WRN("Suspicious y: 0x%02x (looks like state byte), resetting", packet_y);
         zmk_mouse_ps2_activity_reset_packet_buffer();
         return;
     }
 
-    // ========== 3) Overflow 検出 ==========
     int ov_x = (packet_state >> 6) & 1;
     int ov_y = (packet_state >> 7) & 1;
 
     if (ov_x && ov_y) {
-        LOG_WRN("Both overflow detected, resetting buffer");
         zmk_mouse_ps2_activity_reset_packet_buffer();
         return;
     }
 
-    if (ov_x || ov_y) {
-        LOG_DBG("Single overflow: ov_x=%d ov_y=%d", ov_x, ov_y);
-    }
-
-    // ========== 4) ボタンビットをマスク ==========
     packet_state &= ~0x07;
-
-    // ========== 5) パケットをパース ==========
+    
     struct zmk_mouse_ps2_packet packet;
-    packet = zmk_mouse_ps2_activity_parse_packet_buffer(packet_mode, packet_state, packet_x,
-                                                        packet_y, packet_extra);
-
-    // ========== 6) パース後の異常値検出 ==========
+    packet = zmk_mouse_ps2_activity_parse_packet_buffer(...);
+    
     if (packet.mov_x == -256 || packet.mov_y == -256) {
-        LOG_WRN("Dropping: mov=-256");
-        return;
+        return;  // ログなし
     }
-
+    
     if (abs(packet.mov_x) > 100 || abs(packet.mov_y) > 100) {
-        LOG_WRN("Abnormal movement: mov=%d,%d", packet.mov_x, packet.mov_y);
-        return;
+        return;  // ログなし
     }
-
-    // ========== 7) デバッグログ ==========
-    LOG_INF("PS2: st=%02x x=%02x y=%02x ex=%02x | sx=%d sy=%d | mov=%d,%d ov=%d,%d",
-            packet_state, packet_x, packet_y, packet_extra,
-            (packet_state >> 4) & 1, (packet_state >> 5) & 1,
-            packet.mov_x, packet.mov_y,
-            packet.overflow_x, packet.overflow_y);
-
-    // ========== 8) デルタチェック ==========
+    
+#if IS_ENABLED(CONFIG_ZMK_INPUT_MOUSE_PS2_ENABLE_ERROR_MITIGATION)
     int x_delta = abs(data->prev_packet.mov_x - packet.mov_x);
     int y_delta = abs(data->prev_packet.mov_y - packet.mov_y);
-
-#if IS_ENABLED(CONFIG_ZMK_INPUT_MOUSE_PS2_ENABLE_ERROR_MITIGATION)
+    
     if ((packet.mov_x != 0 && packet.mov_y != 0) && (x_delta > 150 || y_delta > 150)) {
-        zmk_mouse_ps2_activity_abort_cmd("Exceeds movement threshold.");
+        zmk_mouse_ps2_activity_abort_cmd("Exceeds threshold");
         return;
     }
 #endif
 
-    // ========== 9) マウス移動を実行 ==========
     zmk_mouse_ps2_activity_move_mouse(packet.mov_x, packet.mov_y);
-
-    // ========== 10) 前回のパケットを保存 ==========
     data->prev_packet = packet;
 }
 
